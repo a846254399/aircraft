@@ -317,7 +317,7 @@ var MyGameWord = function(){
 		}).on('mouseup',function(){
 			clearInterval(that.bulletId);
 		}).on('rightdown',function(){
-			C.bulletId = C.bulletId < 3 ? C.bulletId + 1 : 0; 
+			C.bulletId = C.bulletId < 2 ? C.bulletId + 1 : 0; 
 		});
 
 		//键盘控制
@@ -517,10 +517,3 @@ start();
 </body>
 </html> 
 
-
-
-
-
-
-
-//--></SCRIPT>
