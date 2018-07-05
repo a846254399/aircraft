@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>Document</title>
+	<script src="https://cdn.bootcss.com/pixi.js/4.5.2/pixi.js"></script>
+</head>
+<body>
+	
+
+
+
+
+
+
+
+
+
+<script>
+
+window.C = {
+
+	width : 640,
+	height : 960,
+	//子弹速度
+	bulletSpeed : 1,
+	//子弹间隔
+	bulletInterval : 200,
+	//子弹类型id
+	bulletId : 0,
+	//子弹数量
+	bulletNumber : 4,
+}
+
+window.Public = {
+
+	//获取位置
+	getLocation : function(event,node){
+		return event.data.getLocalPosition(node);
+	},
+
+	//获取事件id
+	getCustomTouchID : function (event) {
+	    return event.data.originalEvent.pointerId || -1;
+	},
+	randomInt : function(min,max){
+		return Math.floor ( Math . random() * (max - min + 1 )) + min;
+	},
+	hitTestRectangle : function(r1, r2) {
+
+	  //Define the variables we'll need to calculate
+	  var hit, combinedHalfWidths, combinedHalfHeights, vx, vy;
+
+	  //hit will determine whether there's a collision
+	  hit = false;
+
+	  //Find the center points of each sprite
+	  r1.centerX = r1.x + r1.width / 2;
+	  r1.centerY = r1.y + r1.height / 2;
+	  r2.centerX = r2.x + r2.width / 2;
+	  r2.centerY = r2.y + r2.height / 2;
+
+	  //Find the half-widths and half-heights of each sprite
+	  r1.halfWidth = r1.width / 2;
+	  r1.halfHeight = r1.height / 2;
+	  r2.halfWidth = r2.width / 2;
+	  r2.halfHeight = r2.height / 2;
+
+	  //Calculate the distance vector between the sprites
+	  vx = r1.centerX - r2.centerX;
+	  vy = r1.centerY - r2.centerY;
+
+	  //Figure out the combined half-widths and half-heights
+	  combinedHalfWidths = r1.halfWidth + r2.halfWidth;
+	  combinedHalfHeights = r1.halfHeight + r2.halfHeight;
+
+	  //Check for a collision on the x axis
+	  if (Math.abs(vx) < combinedHalfWidths) {
+
+	    //A collision might be occuring. Check for a collision on the y axis
+	    if (Math.abs(vy) < combinedHalfHeights) {
+
+	      //There's definitely a collision happening
+	      hit = true;
+	    } else {
+
+	      //There's no collision on the y axis
+	      hit = false;
+	    }
+	  } else {
+
+	    //There's no collision on the x axis
+	    hit = false;
+	  }
+
+	  //`hit` will be either `true` or `false`
+	  return hit;
+	}
+
+}
+
+window.keyboard = function(keyCode) {
+    var key = {};
+    key.code = keyCode;
+    key.isDown = false;
+    key.isUp = true;
+    key.press = undefined;
+    key.release = undefined;
+    //The `downHandler`
+    key.downHandler = function(event) {
+    	if (event.keyCode === key.code) {
+      		if (key.isUp && key.press) key.press();
+      		key.isDown = true;
+      		key.isUp = false;
+    	}
+    	event.preventDefault();
+  	};
+
+  //The `upHandler`
+  	key.upHandler = function(event) {
+    	if (event.keyCode === key.code) {
+      		if (key.isDown && key.release) key.release();
+      		key.isDown = false;
+      		key.isUp = true;
+    	}
+    	event.preventDefault();
+  	};
+
+  	//Attach event listeners
+  	window.addEventListener(
+    	"keydown", key.downHandler.bind(key), false
+  	);
+  	window.addEventListener(
+    	"keyup", key.upHandler.bind(key), false
+  	);
+  	return key;
+}
+
+var Bg = function(){
+
+	let that = {}
+
+	that.init = function(){
+
+		let texture = PIXI.Texture.fromImage('img/bg.jpg'); //创建纹理  
+
+		this.node = new PIXI.extras.TilingSprite(  
+		    texture,  
+		    C.width,
+		    C.height
+		);
+
+	}
+	return that;
+}
+
+	
+var MySprite = function(texture){
+
+	let that = {};
+
+	/**
+	 * 纹理
+	 */
+	that.texture = texture;
+
+	/**
+	 * 精灵
+	 */
+	that.node = new PIXI.Sprite( that.texture );
+	that.node.anchor.set(0.5);
+
+	/**
+	 * 位置
+	 */
+	that.x = 0;
+	that.y = 0;
+
+	//设置纹理
+	that.setTexture = function(texture){
+		that.node.texture = texture;
+	}
+
+	//仅设置位置
+	that.setPosition = function(x,y){
+		that.x = x;
+		that.y = y;
+
+		that.node.position.set(x,y);
+	}
+
+
+	//移动 判断边缘
+	that.move = function(x,y){
+
+		let air = that.node;
+			minx = air.width / 2,
+			miny = air.height / 2,
+			maxx = C.width - minx,
+			maxy = C.height - miny;
+
+		x = x < minx ? minx : x;
+		x = x > maxx ? maxx : x;
+
+		y = y < miny ? miny : y;
+		y = y > maxy ? maxy : y;
+
+		that.x = x;
+		that.y = y;
+
+		that.node.position.set(x,y);
+	};
+	
+	//获取各方位坐标
+	that.getDirLocation = function(){
+		let air = this.node;
+		return {
+			up : this.y - air.height/2,
+			down : this.y + air.height/2,
+			left : this.x - air.width/2,
+			right : this.x + air.width/2
+		};
+	}
+
+	return that;
+}
+
+
+
+var Aircraft = function(texture){
+	let that = MySprite(texture);
+
+	return that;
+}
+var Bullet = function(texture){
+	let that = MySprite(texture);
+
+	that.node.visible = false;
+	
+	/**
+	 * 事件
+	 */
+	//开始发射
+	that.onLaunchStart = ()=>{};
+	//发射中
+	that.onLaunch = ()=>{};
+	//发射完毕
+	that.onLaunchEnd = ()=>{};
+
+	//是否超出范围
+	that.isBeyond = ()=>{
+		return that.y < 0;
+	};
+
+	//发射
+	that.launch = function(){
+		that.node.visible = true;
+		that.onLaunchStart(that);
+		let id = setInterval(function(){
+			if (that.isBeyond()) {
+				clearInterval(id);
+				that.onLaunchEnd(that);
+				return;
+			}	
+			that.setPosition(that.x,that.y-2);
+			that.onLaunch(that);
+		},C.bulletSpeed);
+	}
+	return that;
+}
+
+
+var BulletPlant = function(number){
+	let config = [
+		[0,0,119,216],
+		[771,0,193,120],
+		[51,671,83,210]
+	];
+
+	let o = config[number];
+	let texture = new PIXI.Texture.fromImage('img/bullets.png');
+	let rect = new PIXI.Rectangle(o[0],o[1],o[2],o[3]);
+	texture.frame = rect;
+
+	let bullet = Bullet( texture );
+	bullet.node.scale.set(0.4);
+	return bullet;
+
+}
+
+
+
+var MyGameWord = function(){
+
+	let that = {};
+
+	//子元素
+	that.air = Aircraft( new PIXI.Texture.fromImage('img/aircraft.png') );
+	that.enemy = Aircraft( new PIXI.Texture.fromImage('img/aircraft2.png') );
+
+	that.node = new PIXI.Container();
+
+	that.init = ()=>{
+
+		that.node.addChild(that.air.node);
+		that.node.addChild(that.enemy.node);
+
+		//绑定事件
+		that.air.node.interactive = true;
+		that.air.node.on('mousemove',function(event,target){
+			let pos = event.data.getLocalPosition(that.node);
+			that.moveAircraft(pos.x,pos.y);
+		}).on('mousedown',function(e,t){
+			that.bulletId = setInterval(function(){
+				that.launchBullet();
+			},C.bulletInterval)
+		}).on('mouseup',function(){
+			clearInterval(that.bulletId);
+		}).on('rightdown',function(){
+			C.bulletId = C.bulletId < 3 ? C.bulletId + 1 : 0; 
+		});
+
+		//键盘控制
+		keyControl(that);
+	}
+
+	//移动飞机
+	that.moveAircraft = (x,y)=>{
+		that.air.move(x,y);
+	} 
+
+	//发射子弹
+	that.launchBullet = ()=>{
+		let x = that.air.x;
+		let y = that.air.getDirLocation().up;
+
+		let number = C.bulletNumber;
+
+		//发射子弹 
+		for (let i = 0;i < number;i++) {
+			let bullet = BulletPlant(C.bulletId);
+
+			if (i < number/2 ) {
+				bullet.setPosition(x-i*bullet.node.width,y);
+			}else{
+				bullet.setPosition(x+(i-number/2+1)*bullet.node.width,y);
+			}
+
+			bullet.onLaunch = onLaunch;
+			bullet.onLaunchEnd = onLaunchEnd;
+			that.node.addChild(bullet.node);
+			bullet.launch();
+		}
+	}
+
+	//发射中
+	let onLaunch = function(bullet){
+
+		if( Public.hitTestRectangle(bullet.node,that.enemy.node) ){
+
+			that.enemy.setTexture(new PIXI.Texture.fromImage('img/explode.gif'));
+
+			setTimeout(function(){
+				that.node.removeChild(bullet.node);
+				that.node.removeChild(that.enemy.node);
+				that.enemy = createEnemy();
+			},1000);
+		}
+		// console.log(bullet.x,bullet.y);
+	}
+
+	//发射完毕
+	let onLaunchEnd = function(bullet){
+		that.node.removeChild(bullet.node);
+	}
+
+	//创建敌机
+	let createEnemy = function(){
+		let aircraft = Aircraft( new PIXI.Texture.fromImage('img/aircraft2.png') );
+		//TODO::BUG
+		let x = Public.randomInt(aircraft.node.width/2,C.width-aircraft.node.width/2);
+		let y =	100;
+
+		aircraft.setPosition(x,y);
+		
+		that.node.addChild(aircraft.node);
+
+		return aircraft;
+	}
+
+	return that;
+
+
+}
+
+window.keyControl = function(gameWorld){
+
+	let aircraft = gameWorld.air;
+
+	const MOVE_UP = 87;//w
+	const MOVE_DOWN = 83;//s
+	const MOVE_LEFT = 65;//a
+	const MOVE_RIGHT = 68;//d
+
+	const LAUNCH_BULLET = 74;//j
+
+	//移动速度 毫秒
+	const MOVE_SPEED = 3;
+	//发射子弹 间隔
+	const BULLET_SPEED = 10;
+
+
+	let keyObj = keyboard();
+
+
+	let moveTop = function(){
+		let key = window.keyboard(MOVE_UP);
+		let eid = null;
+		key.press = function(){
+			eid = setInterval(function(){
+				aircraft.move(aircraft.x,aircraft.y-1)
+			},MOVE_SPEED);
+		}
+		key.release = function(){
+			clearInterval(eid);
+		}
+	}
+
+	let moveDown = function(){
+		let key = window.keyboard(MOVE_DOWN);
+		let eid = null;
+		key.press = function(){
+			eid = setInterval(function(){
+				aircraft.move(aircraft.x,aircraft.y+1)
+			},MOVE_SPEED);
+		}
+		key.release = function(){
+			clearInterval(eid);
+		}
+	}
+	let moveLeft = function(){
+		let key = window.keyboard(MOVE_LEFT);
+		let eid = null;
+		key.press = function(){
+			eid = setInterval(function(){
+				aircraft.move(aircraft.x-1,aircraft.y)
+			},MOVE_SPEED);
+		}
+		key.release = function(){
+			clearInterval(eid);
+		}
+	}
+
+	let moveRight = function(){
+		let key = window.keyboard(MOVE_RIGHT);
+		let eid = null;
+		key.press = function(){
+			eid = setInterval(function(){
+				aircraft.move(aircraft.x+1,aircraft.y)
+			},MOVE_SPEED);
+		}
+		key.release = function(){
+			clearInterval(eid);
+		}
+	}
+
+	let launch = function(){
+		let key = window.keyboard(LAUNCH_BULLET);
+		let eid = null;
+		key.press = function(){
+			eid = setInterval(function(){
+				gameWorld.launchBullet()
+			},C.bulletInterval);
+		}
+		key.release = function(){
+			clearInterval(eid);
+		}
+	}
+
+	moveTop();
+	moveDown();
+	moveLeft();
+	moveRight();
+	launch();
+}
+
+function start(){
+
+	var renderer = new PIXI.Application(C.width,C.height);
+	document.body.appendChild(renderer.view);
+
+	//bg
+	let bg = Bg();
+	bg.init();
+	renderer.stage.addChild(bg.node);
+	//game
+	let word = MyGameWord();
+	word.init();
+	renderer.stage.addChild(word.node);
+
+
+	renderer.render();
+
+	renderer.ticker.add(function(){
+		bg.node.tilePosition.y += 1;
+	});
+};
+
+start();
+
+
+
+
+
+</script>
+
+</body>
+</html> 
+
+
+
+
+
+
+
+//--></SCRIPT>
